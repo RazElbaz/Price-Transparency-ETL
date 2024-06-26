@@ -36,12 +36,11 @@ The project is containerized using Docker Compose, with the following services:
 
 The DAG `shufersal_branches_extraction` performs the following tasks:
 1. **Create PostgreSQL Table**: Creates a table in PostgreSQL to store the pricing data.
-2. **Extract Data**: Extracts pricing data from the Shufersal website.
-3. **Transform Data**: Transforms the extracted XML data into a format suitable for loading into PostgreSQL.
-4. **Load Data**: Loads the transformed data into the PostgreSQL database.
-5. **Clear XML Files**: Clears the downloaded XML files to save space.
-6. **Generate Report**: Generates a report identifying common products across all branches and the branch with the cheapest basket.
-
+2. **Extract Data**: Extracts pricing data from the Shufersal website using `extract_data`.
+3. **Transform Data**: Transforms the extracted XML data into a format suitable for loading into PostgreSQL with `transform_data`.
+4. **Load Data**: Loads the transformed data into the PostgreSQL database using `load_to_postgres`.
+5. **Get Common Products and Cheapest Basket**: Retrieves common products across branches and identifies the branch with the cheapest basket using `get_common_products_and_cheapest_basket`.
+6. **Clear XML Files**: Clears the downloaded XML files to save space using `clear_xml_files_directory`.
 
 ### Prerequisites
 
@@ -95,23 +94,88 @@ This command opens an interactive PostgreSQL shell, allowing you to execute SQL 
 
 ## SQL Queries
 
-The SQL queries used in the reporting task are:
-- **Find Common Products Across All Branches**:
+ **Find Common Products Across All Branches**:
     ```sql
+    WITH common_items AS (
+        -- Step 1: Identify the list of items common across most branches
+        SELECT ItemCode, ItemName
+        FROM (
+            SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+            FROM stores
+            GROUP BY ItemCode, ItemName
+            ORDER BY COUNT(DISTINCT StoreId) DESC
+            LIMIT 30 -- Adjust this limit to get the top items by number of branches
+        ) AS top_items
+    )
+    -- Query to display the list of common items
     SELECT ItemCode, ItemName
-    FROM stores
-    GROUP BY ItemCode, ItemName
-    HAVING COUNT(DISTINCT StoreId) = (SELECT COUNT(DISTINCT StoreId) FROM stores)
+    FROM common_items;
     ```
 
 - **Find the Cheapest Basket**:
     ```sql
-    SELECT StoreId, SUM(ItemPrice) as TotalPrice
-    FROM stores
-    GROUP BY StoreId
+    WITH common_items AS (
+        -- Step 1: Identify the list of items common across most branches
+        SELECT ItemCode, ItemName
+        FROM (
+            SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+            FROM stores
+            GROUP BY ItemCode, ItemName
+            ORDER BY COUNT(DISTINCT StoreId) DESC
+            LIMIT 30 -- Adjust this limit to get the top items by number of branches
+        ) AS top_items
+    ), 
+    branches_with_common_items AS (
+        -- Step 2: Find branches that have all the common items
+        SELECT s.StoreId, SUM(s.ItemPrice) AS TotalPrice
+        FROM stores s
+        JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+        GROUP BY s.StoreId
+        HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+    )
+    -- Step 3: Find the branch with the cheapest sum of item prices
+    SELECT StoreId, TotalPrice
+    FROM branches_with_common_items
     ORDER BY TotalPrice ASC
-    LIMIT 1
+    LIMIT 1;
     ```
-    
+
+- **Test Query for Top 15 Common Items Across Branches**:
+    ```sql
+    WITH common_items AS (
+        -- Step 1: Identify the list of top 15 items common across most branches
+        SELECT ItemCode, ItemName
+        FROM (
+            SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+            FROM stores
+            GROUP BY ItemCode, ItemName
+            ORDER BY COUNT(DISTINCT StoreId) DESC
+            LIMIT 30 -- Adjust this limit to get the top 30 items
+        ) AS top_items
+    ),
+    branches_with_common_items AS (
+        -- Step 2: Find branches that have all the top 15 common items
+        SELECT s.StoreId, ARRAY_AGG(s.ItemCode || ' - ' || s.ItemName) AS common_items_list, SUM(s.ItemPrice) AS TotalPrice
+        FROM stores s
+        JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+        GROUP BY s.StoreId
+        HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+    )
+    -- Step 3: Fetch and display the results
+    SELECT StoreId, TotalPrice, common_items_list
+    FROM branches_with_common_items
+    ORDER BY TotalPrice ASC;
+    ```
+
+
+### Analytics and Insights
+
+The `get_common_products_and_cheapest_basket` function in the ETL pipeline leverages these SQL queries to derive valuable insights:
+
+- **Common Products**: It identifies which products are commonly available across the most branches, indicating popular or essential items.
+  
+- **Cheapest Basket**: It determines which branch offers the lowest combined price for the identified common products, providing insights into the most cost-effective shopping options.
+
+These analytics help consumers compare prices effectively and make informed decisions when shopping at various branches of the supermarket chain.
 ---
 

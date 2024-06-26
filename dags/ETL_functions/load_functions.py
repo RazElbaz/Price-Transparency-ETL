@@ -187,7 +187,7 @@ def get_common_products_and_cheapest_basket():
         cur.close()
         conn.close()
 
-#for test
+# for test
 # WITH common_items AS (
 #     -- Step 1: Identify the list of top 15 items common across most branches
 #     SELECT ItemCode, ItemName
