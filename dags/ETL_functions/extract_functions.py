@@ -46,7 +46,7 @@ def extract_data():
 
     all_branches = []
 
-    for page_number in range(1, max_pages + 1):
+    for page_number in range(23, max_pages + 1):
         url = base_url if page_number == 1 else f"{base_url}/?page={page_number}"
         try:
             response = requests.get(url)

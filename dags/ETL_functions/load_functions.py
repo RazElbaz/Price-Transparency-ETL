@@ -110,6 +110,133 @@ def load_to_postgres(**kwargs):
 
     try:
         insert_data_to_postgres(conn, cur, transformed_data)
+        get_common_products_and_cheapest_basket()
+        # calculate_total_branch_prices_for_same_items()
     finally:
         cur.close()
         conn.close()
+
+
+
+def get_common_products_and_cheapest_basket():
+    conn, cur = connect_to_postgres()
+
+    try:
+        # Step 1: Get the list of common items across more than 50 branches
+        common_items_query = """
+            WITH common_items AS (
+                -- Step 1: Identify the list of items common across most branches
+                SELECT ItemCode, ItemName
+                FROM (
+                    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+                    FROM stores
+                    GROUP BY ItemCode, ItemName
+                    ORDER BY COUNT(DISTINCT StoreId) DESC
+                    LIMIT 30 -- Adjust this limit to get the top items by number of branches
+                ) AS top_items
+            )
+            -- Query to display the list of common items
+            SELECT ItemCode, ItemName
+            FROM common_items
+        """
+        cur.execute(common_items_query)
+        common_items = cur.fetchall()
+
+        print("Common Products found across branches:")
+        for item in common_items:
+            print(item)
+
+        # Step 2: Find the total price of these common items in each branch
+        total_branch_prices_query = """
+            WITH common_items AS (
+                -- Step 1: Identify the list of items common across most branches
+                SELECT ItemCode, ItemName
+                FROM (
+                    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+                    FROM stores
+                    GROUP BY ItemCode, ItemName
+                    ORDER BY COUNT(DISTINCT StoreId) DESC
+                    LIMIT 30 -- Adjust this limit to get the top items by number of branches
+                ) AS top_items
+            ), 
+            branches_with_common_items AS (
+                -- Step 2: Find branches that have all the common items
+                SELECT s.StoreId, SUM(s.ItemPrice) AS TotalPrice
+                FROM stores s
+                JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+                GROUP BY s.StoreId
+                HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+            )
+            -- Step 3: Find the branch with the cheapest sum of item prices
+            SELECT StoreId, TotalPrice
+            FROM branches_with_common_items
+            ORDER BY TotalPrice ASC
+            LIMIT 1
+        """
+        cur.execute(total_branch_prices_query)
+        cheapest_basket = cur.fetchone()
+
+        print("\nBranch with the Cheapest Basket of Common Items:")
+        print(f"StoreId: {cheapest_basket[0]}, TotalPrice: {cheapest_basket[1]}")
+
+        return common_items, cheapest_basket
+
+    except Exception as e:
+        print(f"Error querying data from PostgreSQL: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+#for test
+# WITH common_items AS (
+#     -- Step 1: Identify the list of top 15 items common across most branches
+#     SELECT ItemCode, ItemName
+#     FROM (
+#         SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+#         FROM stores
+#         GROUP BY ItemCode, ItemName
+#         ORDER BY COUNT(DISTINCT StoreId) DESC
+#         LIMIT 15 -- Adjust this limit to get the top 15 items
+#     ) AS top_items
+# ),
+# branches_with_common_items AS (
+#     -- Step 2: Find branches that have all the top 15 common items
+#     SELECT s.StoreId, ARRAY_AGG(s.ItemCode || ' - ' || s.ItemName) AS common_items_list, SUM(s.ItemPrice) AS TotalPrice
+#     FROM stores s
+#     JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+#     GROUP BY s.StoreId
+#     HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+# )
+# -- Step 3: Fetch and display the results
+# SELECT StoreId, TotalPrice, common_items_list
+# FROM branches_with_common_items
+# ORDER BY TotalPrice ASC;
+# """
+#             WITH common_items AS (
+#                 -- Step 1: Identify the list of items common across most branches
+#                 SELECT ItemCode, ItemName
+#                 FROM (
+#                     SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+#                     FROM stores
+#                     GROUP BY ItemCode, ItemName
+#                     ORDER BY COUNT(DISTINCT StoreId) DESC
+#                     LIMIT 30 -- Adjust this limit to get the top items by number of branches
+#                 ) AS top_items
+#             ), 
+#             branches_with_common_items AS (
+#                 -- Step 2: Find branches that have all the common items
+#                 SELECT s.StoreId, ARRAY_AGG(s.ItemCode || ' - ' || s.ItemName) AS common_items_list, SUM(s.ItemPrice) AS TotalPrice
+#                 FROM stores s
+#                 JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+#                 GROUP BY s.StoreId
+#                 HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+#             )
+#             -- Step 3: Find the branch with the cheapest sum of item prices
+#             SELECT StoreId, TotalPrice, common_items_list
+#             FROM branches_with_common_items
+#             ORDER BY TotalPrice ASC
+#             LIMIT 1
+
+#         """
+
+#

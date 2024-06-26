@@ -27,17 +27,19 @@ def extract_data():
     from ETL_functions.extract_functions import extract_data
     extract_data()
 
+def load_data(**kwargs):
+    from ETL_functions.load_functions import load_to_postgres
+    load_to_postgres(**kwargs)
+
+def get_common_products_and_cheapest_basket():
+    from ETL_functions.load_functions import get_common_products_and_cheapest_basket
+    get_common_products_and_cheapest_basket()
+
+
 def create_postgres_table():
     from ETL_functions.load_functions import create_postgres_table
     create_postgres_table()
 
-# def extract_postgres_data_to_file(output_filepath):
-#     from dags.ETL_functions.load_functions import extract_postgres_data_to_file
-#     extract_postgres_data_to_file(output_filepath)
-
-def load_data(**kwargs):
-    from ETL_functions.load_functions import load_to_postgres
-    load_to_postgres(**kwargs)
 
 def clear_xml_files_directory():
     xml_dir = "/usr/local/airflow/dags/xml_files"
@@ -53,7 +55,7 @@ def clear_xml_files_directory():
 
 with DAG('shufersal_branches_extraction', 
          default_args=default_args,
-         schedule_interval='*/30 * * * *',
+         schedule_interval='*/60 * * * *',
          catchup=False, 
           max_active_runs=1 
          ) as dag:  
@@ -81,11 +83,19 @@ with DAG('shufersal_branches_extraction',
         provide_context=True  
     )
 
+
+    get_common_products_and_cheapest_basket_task = PythonOperator(
+        task_id='get_common_products_and_cheapest_basket',
+        python_callable=get_common_products_and_cheapest_basket
+    )
+
+
     clear_xml_files_task = PythonOperator(
         task_id='clear_xml_files_directory',
         python_callable=clear_xml_files_directory,
         trigger_rule='all_done'  # Run after all tasks are done
     )
 
-    create_table_task >> extract_task >> transform_task >> load_task  >> clear_xml_files_task
+    create_table_task >> extract_task >> transform_task >> load_task  >> get_common_products_and_cheapest_basket_task >> clear_xml_files_task
+
  

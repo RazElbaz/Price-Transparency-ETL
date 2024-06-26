@@ -17,7 +17,7 @@ The ETL pipeline consists of the following main tasks:
 
 ### Directory Structure
 
-- **dags/**: Contains the Airflow DAG definition file (`shufersal_branches_extraction.py`).
+- **dags/**: Contains the Airflow DAG definition file (`etl_dag.py`).
 - **ETL_functions/**:
   - **extract_functions.py**: Contains functions for extracting data from the Shufersal website.
   - **load_functions.py**: Includes functions for PostgreSQL operations, such as creating tables and loading data.
@@ -32,6 +32,17 @@ The project is containerized using Docker Compose, with the following services:
 
 ## Getting Started
 
+## DAG Details
+
+The DAG `shufersal_branches_extraction` performs the following tasks:
+1. **Create PostgreSQL Table**: Creates a table in PostgreSQL to store the pricing data.
+2. **Extract Data**: Extracts pricing data from the Shufersal website.
+3. **Transform Data**: Transforms the extracted XML data into a format suitable for loading into PostgreSQL.
+4. **Load Data**: Loads the transformed data into the PostgreSQL database.
+5. **Clear XML Files**: Clears the downloaded XML files to save space.
+6. **Generate Report**: Generates a report identifying common products across all branches and the branch with the cheapest basket.
+
+
 ### Prerequisites
 
 - Docker and Docker Compose installed on your machine.
@@ -40,7 +51,7 @@ The project is containerized using Docker Compose, with the following services:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/price-transparency-etl.git
+   git clone https://github.com/RazElbaz/price-transparency-etl.git
    cd price-transparency-etl
    ```
 
@@ -71,5 +82,36 @@ docker-compose down
 
 This command stops and removes all the containers defined in the `docker-compose.yml` file.
 
+### Connecting to PostgreSQL from Terminal
+
+To connect to the PostgreSQL database from the terminal, use the following command:
+
+```bash
+docker exec -it price-transparency-etl-postgres-1 psql -U airflow
+```
+
+This command opens an interactive PostgreSQL shell, allowing you to execute SQL commands directly against the database.
+
+
+## SQL Queries
+
+The SQL queries used in the reporting task are:
+- **Find Common Products Across All Branches**:
+    ```sql
+    SELECT ItemCode, ItemName
+    FROM stores
+    GROUP BY ItemCode, ItemName
+    HAVING COUNT(DISTINCT StoreId) = (SELECT COUNT(DISTINCT StoreId) FROM stores)
+    ```
+
+- **Find the Cheapest Basket**:
+    ```sql
+    SELECT StoreId, SUM(ItemPrice) as TotalPrice
+    FROM stores
+    GROUP BY StoreId
+    ORDER BY TotalPrice ASC
+    LIMIT 1
+    ```
+    
 ---
 
