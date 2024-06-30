@@ -10,18 +10,21 @@ The **Price Transparency ETL** project aims to enhance price transparency in the
 
 The ETL pipeline consists of the following main tasks:
 
-1. **Extract**: Downloads price data from the Shufersal website.
+1. **Extract**: Downloads price data from the Shufersal and Victory websites.
 2. **Transform**: Parses XML files, transforms and standardizes the data.
 3. **Load**: Inserts the transformed data into a PostgreSQL database.
 4. **PostgreSQL Operations**: Creates necessary tables in PostgreSQL and handles data loading.
+5. **Analytics**: Identifies common products across branches and determines the cheapest basket.
 
 ### Directory Structure
 
 - **dags/**: Contains the Airflow DAG definition file (`etl_dag.py`).
 - **ETL_functions/**:
-  - **extract_functions.py**: Contains functions for extracting data from the Shufersal website.
+  - **extract_functions_shufersal.py**: Contains functions for extracting data from the Shufersal website.
+  - **extract_functions_victory.py**: Contains functions for extracting data from the Victory website.
   - **load_functions.py**: Includes functions for PostgreSQL operations, such as creating tables and loading data.
-  - **transform_functions.py**: Contains functions for transforming XML data extracted from Shufersal.
+  - **transform_functions_shufersal.py**: Contains functions for transforming XML data extracted from Shufersal.
+  - **transform_functions_victory.py**: Contains functions for transforming XML data extracted from Victory.
 
 ### Docker Configuration
 
@@ -34,10 +37,14 @@ The project is containerized using Docker Compose, with the following services:
 
 ## DAG Details
 
-The DAG `shufersal_branches_extraction` performs the following tasks:
+The DAG `branches_extraction` performs the following tasks:
 1. **Create PostgreSQL Table**: Creates a table in PostgreSQL to store the pricing data.
-2. **Extract Data**: Extracts pricing data from the Shufersal website using `extract_data`.
-3. **Transform Data**: Transforms the extracted XML data into a format suitable for loading into PostgreSQL with `transform_data`.
+2. **Extract Data**:
+   - Extracts pricing data from the Shufersal website using `extract_data_shufersal`.
+   - Extracts pricing data from the Victory website using `extract_data_victory`.
+3. **Transform Data**:
+   - Transforms the extracted XML data from Shufersal into a format suitable for loading into PostgreSQL with `transform_data_shufersal`.
+   - Transforms the extracted XML data from Victory into a format suitable for loading into PostgreSQL with `transform_data_victory`.
 4. **Load Data**: Loads the transformed data into the PostgreSQL database using `load_to_postgres`.
 5. **Get Common Products and Cheapest Basket**: Retrieves common products across branches and identifies the branch with the cheapest basket using `get_common_products_and_cheapest_basket`.
 6. **Clear XML Files**: Clears the downloaded XML files to save space using `clear_xml_files_directory`.
@@ -65,8 +72,8 @@ The DAG `shufersal_branches_extraction` performs the following tasks:
 
 4. **Configure Airflow DAG**:
    - Navigate to the Airflow UI (`localhost:8080`).
-   - Enable the `shufersal_branches_extraction` DAG.
-   - Trigger the DAG manually or wait for the scheduled interval (`*/30 * * * *` by default) to start the ETL process.
+   - Enable the `branches_extraction` DAG.
+   - Trigger the DAG manually or wait for the scheduled interval (`0 */2 * * *` by default) to start the ETL process.
 
 5. **Monitor and Manage DAG**:
    Use the Airflow UI to monitor DAG runs, view task logs, and manage workflow execution.
@@ -140,57 +147,57 @@ This command opens an interactive PostgreSQL shell, allowing you to execute SQL 
 
 - **Find the Cheapest Basket**:
     ```sql
-    WITH common_items AS (
-        -- Step 1: Identify the list of items common across most branches
-        SELECT ItemCode, ItemName
-        FROM (
-            SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
-            FROM stores
-            GROUP BY ItemCode, ItemName
-            ORDER BY COUNT(DISTINCT StoreId) DESC
-            LIMIT 30 -- Adjust this limit to get the top items by number of branches
-        ) AS top_items
-    ), 
-    branches_with_common_items AS (
-        -- Step 2: Find branches that have all the common items
-        SELECT s.StoreId, SUM(s.ItemPrice) AS TotalPrice
-        FROM stores s
-        JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
-        GROUP BY s.StoreId
-        HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
-    )
-    -- Step 3: Find the branch with the cheapest sum of item prices
-    SELECT StoreId, TotalPrice
-    FROM branches_with_common_items
-    ORDER BY TotalPrice ASC
-    LIMIT 1;
+                WITH common_items AS (
+                -- Step 1: Identify the list of items common across most branches
+                SELECT ItemCode, ItemName
+                FROM (
+                    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+                    FROM stores
+                    GROUP BY ItemCode, ItemName
+                    ORDER BY COUNT(DISTINCT StoreId) DESC
+                    LIMIT 30 -- Adjust this limit to get the top items by number of branches
+                ) AS top_items
+            ), 
+            branches_with_common_items AS (
+                -- Step 2: Find branches that have all the common items
+                SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
+                FROM stores s
+                JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+                GROUP BY s.StoreId, s.SupermarketChain
+                HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+            )
+            -- Step 3: Find the branch with the cheapest sum of item prices
+            SELECT StoreId, SupermarketChain, TotalPrice
+            FROM branches_with_common_items
+            ORDER BY TotalPrice ASC
+            LIMIT 1;
     ```
 
 - **Test Query for Top 30 Common Items Across Branches**:
     ```sql
-    WITH common_items AS (
-        -- Step 1: Identify the list of top 15 items common across most branches
-        SELECT ItemCode, ItemName
-        FROM (
-            SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
-            FROM stores
-            GROUP BY ItemCode, ItemName
-            ORDER BY COUNT(DISTINCT StoreId) DESC
-            LIMIT 30 -- Adjust this limit to get the top 30 items
-        ) AS top_items
-    ),
-    branches_with_common_items AS (
-        -- Step 2: Find branches that have all the top 15 common items
-        SELECT s.StoreId, ARRAY_AGG(s.ItemCode || ' - ' || s.ItemName) AS common_items_list, SUM(s.ItemPrice) AS TotalPrice
-        FROM stores s
-        JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
-        GROUP BY s.StoreId
-        HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
-    )
-    -- Step 3: Fetch and display the results
-    SELECT StoreId, TotalPrice, common_items_list
-    FROM branches_with_common_items
-    ORDER BY TotalPrice ASC;
+                WITH common_items AS (
+                -- Step 1: Identify the list of items common across most branches
+                SELECT ItemCode, ItemName
+                FROM (
+                    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+                    FROM stores
+                    GROUP BY ItemCode, ItemName
+                    ORDER BY COUNT(DISTINCT StoreId) DESC
+                    LIMIT 30 -- Adjust this limit to get the top items by number of branches
+                ) AS top_items
+            ), 
+            branches_with_common_items AS (
+                -- Step 2: Find branches that have all the common items
+                SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
+                FROM stores s
+                JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+                GROUP BY s.StoreId, s.SupermarketChain
+                HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+            )
+            -- Step 3: Find the branch with the cheapest sum of item prices
+            SELECT StoreId, SupermarketChain, TotalPrice
+            FROM branches_with_common_items
+            ORDER BY TotalPrice ASC;
     ```
 
 
