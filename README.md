@@ -127,7 +127,7 @@ This command opens an interactive PostgreSQL shell, allowing you to execute SQL 
 
 ## SQL Queries
 
- **Find Common Products Across All Branches**:
+- **Find Common Products Across All Branches**:
 ```sql
 WITH common_items AS (
     -- Step 1: Identify the list of items common across most branches
