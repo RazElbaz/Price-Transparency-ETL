@@ -128,22 +128,22 @@ This command opens an interactive PostgreSQL shell, allowing you to execute SQL 
 ## SQL Queries
 
  **Find Common Products Across All Branches**:
-    ```sql
-    WITH common_items AS (
-        -- Step 1: Identify the list of items common across most branches
-        SELECT ItemCode, ItemName
-        FROM (
-            SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
-            FROM stores
-            GROUP BY ItemCode, ItemName
-            ORDER BY COUNT(DISTINCT StoreId) DESC
-            LIMIT 30 -- Adjust this limit to get the top items by number of branches
-        ) AS top_items
-    )
-    -- Query to display the list of common items
+```sql
+WITH common_items AS (
+    -- Step 1: Identify the list of items common across most branches
     SELECT ItemCode, ItemName
-    FROM common_items;
-    ```
+    FROM (
+        SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+        FROM stores
+        GROUP BY ItemCode, ItemName
+        ORDER BY COUNT(DISTINCT StoreId) DESC
+        LIMIT 30 -- Adjust this limit to get the top items by number of branches
+    ) AS top_items
+)
+-- Query to display the list of common items
+SELECT ItemCode, ItemName
+FROM common_items;
+```
 
 - **Find the Cheapest Basket**:
     ```sql
