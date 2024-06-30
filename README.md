@@ -171,7 +171,7 @@ SELECT StoreId, SupermarketChain, TotalPrice
 FROM branches_with_common_items
 ORDER BY TotalPrice ASC
 LIMIT 1;
-    ```
+```
 
 - **Test Query for Top 30 Common Items Across Branches**:
 ```sql
@@ -198,7 +198,7 @@ HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_i
 SELECT StoreId, SupermarketChain, TotalPrice
 FROM branches_with_common_items
 ORDER BY TotalPrice ASC;
-    ```
+```
 
 
 ### Analytics and Insights
