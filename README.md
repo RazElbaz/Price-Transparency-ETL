@@ -129,75 +129,75 @@ This command opens an interactive PostgreSQL shell, allowing you to execute SQL 
 
 - **Find Common Products Across All Branches**:
 ```sql
-                  WITH common_items AS (
-                      -- Step 1: Identify the list of items common across most branches
-                      SELECT ItemCode, ItemName
-                      FROM (
-                          SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
-                          FROM stores
-                          GROUP BY ItemCode, ItemName
-                          ORDER BY COUNT(DISTINCT StoreId) DESC
-                          LIMIT 30 -- Adjust this limit to get the top items by number of branches
-                      ) AS top_items
-                  )
-                  -- Query to display the list of common items
-                  SELECT ItemCode, ItemName
-                  FROM common_items;
+WITH common_items AS (
+    -- Step 1: Identify the list of items common across most branches
+    SELECT ItemCode, ItemName
+    FROM (
+        SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+        FROM stores
+        GROUP BY ItemCode, ItemName
+        ORDER BY COUNT(DISTINCT StoreId) DESC
+        LIMIT 30 -- Adjust this limit to get the top items by number of branches
+    ) AS top_items
+)
+-- Query to display the list of common items
+SELECT ItemCode, ItemName
+FROM common_items;
 ```
 
 - **Find the Cheapest Basket**:
     ```sql
-                WITH common_items AS (
-                -- Step 1: Identify the list of items common across most branches
-                SELECT ItemCode, ItemName
-                FROM (
-                    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
-                    FROM stores
-                    GROUP BY ItemCode, ItemName
-                    ORDER BY COUNT(DISTINCT StoreId) DESC
-                    LIMIT 30 -- Adjust this limit to get the top items by number of branches
-                ) AS top_items
-            ), 
-            branches_with_common_items AS (
-                -- Step 2: Find branches that have all the common items
-                SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
-                FROM stores s
-                JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
-                GROUP BY s.StoreId, s.SupermarketChain
-                HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
-            )
-            -- Step 3: Find the branch with the cheapest sum of item prices
-            SELECT StoreId, SupermarketChain, TotalPrice
-            FROM branches_with_common_items
-            ORDER BY TotalPrice ASC
-            LIMIT 1;
+WITH common_items AS (
+-- Step 1: Identify the list of items common across most branches
+SELECT ItemCode, ItemName
+FROM (
+    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+    FROM stores
+    GROUP BY ItemCode, ItemName
+    ORDER BY COUNT(DISTINCT StoreId) DESC
+    LIMIT 30 -- Adjust this limit to get the top items by number of branches
+) AS top_items
+), 
+branches_with_common_items AS (
+-- Step 2: Find branches that have all the common items
+SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
+FROM stores s
+JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+GROUP BY s.StoreId, s.SupermarketChain
+HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+)
+-- Step 3: Find the branch with the cheapest sum of item prices
+SELECT StoreId, SupermarketChain, TotalPrice
+FROM branches_with_common_items
+ORDER BY TotalPrice ASC
+LIMIT 1;
     ```
 
 - **Test Query for Top 30 Common Items Across Branches**:
-    ```sql
-                WITH common_items AS (
-                -- Step 1: Identify the list of items common across most branches
-                SELECT ItemCode, ItemName
-                FROM (
-                    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
-                    FROM stores
-                    GROUP BY ItemCode, ItemName
-                    ORDER BY COUNT(DISTINCT StoreId) DESC
-                    LIMIT 30 -- Adjust this limit to get the top items by number of branches
-                ) AS top_items
-            ), 
-            branches_with_common_items AS (
-                -- Step 2: Find branches that have all the common items
-                SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
-                FROM stores s
-                JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
-                GROUP BY s.StoreId, s.SupermarketChain
-                HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
-            )
-            -- Step 3: Find the branch with the cheapest sum of item prices
-            SELECT StoreId, SupermarketChain, TotalPrice
-            FROM branches_with_common_items
-            ORDER BY TotalPrice ASC;
+```sql
+WITH common_items AS (
+-- Step 1: Identify the list of items common across most branches
+SELECT ItemCode, ItemName
+FROM (
+    SELECT ItemCode, ItemName, COUNT(DISTINCT StoreId) AS num_branches
+    FROM stores
+    GROUP BY ItemCode, ItemName
+    ORDER BY COUNT(DISTINCT StoreId) DESC
+    LIMIT 30 -- Adjust this limit to get the top items by number of branches
+) AS top_items
+), 
+branches_with_common_items AS (
+-- Step 2: Find branches that have all the common items
+SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
+FROM stores s
+JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
+GROUP BY s.StoreId, s.SupermarketChain
+HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
+)
+-- Step 3: Find the branch with the cheapest sum of item prices
+SELECT StoreId, SupermarketChain, TotalPrice
+FROM branches_with_common_items
+ORDER BY TotalPrice ASC;
     ```
 
 
