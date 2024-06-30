@@ -146,7 +146,7 @@ FROM common_items;
 ```
 
 - **Find the Cheapest Basket**:
-    ```sql
+```sql
 WITH common_items AS (
 -- Step 1: Identify the list of items common across most branches
 SELECT ItemCode, ItemName
