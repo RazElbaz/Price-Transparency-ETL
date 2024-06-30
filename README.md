@@ -81,6 +81,32 @@ docker-compose down
 
 This command stops and removes all the containers defined in the `docker-compose.yml` file.
 
+### Viewing Airflow Task Logs
+
+To view the Airflow task logs generated during DAG execution, follow these steps:
+
+1. **Access Logs Inside Docker Container**:
+   - Use `docker exec` to access the Airflow container:
+     ```bash
+     docker exec -it price-transparency-etl-webserver-1 /bin/bash
+     ```
+     Replace `price-transparency-etl-webserver-1` with your Airflow container name.
+
+2. **Navigate to Logs Directory**:
+   - Once inside the container, navigate to the logs directory:
+     ```bash
+     cd /usr/local/airflow/logs
+     ```
+
+3. **View Logs**:
+   - Use standard Unix commands (`ls`, `tail`, `cat`) to list and view log files.
+
+4. **Exit Container**:
+   - After viewing logs, exit the container:
+     ```bash
+     exit
+     ```
+
 ### Connecting to PostgreSQL from Terminal
 
 To connect to the PostgreSQL database from the terminal, use the following command:
@@ -140,7 +166,7 @@ This command opens an interactive PostgreSQL shell, allowing you to execute SQL 
     LIMIT 1;
     ```
 
-- **Test Query for Top 15 Common Items Across Branches**:
+- **Test Query for Top 30 Common Items Across Branches**:
     ```sql
     WITH common_items AS (
         -- Step 1: Identify the list of top 15 items common across most branches

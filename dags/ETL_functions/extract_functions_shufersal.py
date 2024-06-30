@@ -8,7 +8,7 @@ import shutil
 
 def extract_xml_from_gz(gz_filepath):
     xml_filename = os.path.splitext(os.path.basename(gz_filepath))[0] + '.xml'
-    extract_filepath = os.path.join('/usr/local/airflow/dags/xml_files', xml_filename)
+    extract_filepath = os.path.join('/usr/local/airflow/dags/xml_files_shufersal', xml_filename)
     
     with gzip.open(gz_filepath, 'rb') as f_in, open(extract_filepath, 'wb') as f_out:
         shutil.copyfileobj(f_in, f_out)
@@ -21,8 +21,8 @@ def download_and_extract_file(url):
             r.raise_for_status()
             parsed_url = urllib.parse.urlparse(url)
             filename = urllib.parse.unquote(os.path.basename(parsed_url.path))  # Decode URL encoded characters
-            os.makedirs("/usr/local/airflow/dags/xml_files", exist_ok=True)
-            local_filepath = os.path.join('/usr/local/airflow/dags/xml_files', filename)
+            os.makedirs("/usr/local/airflow/dags/xml_files_shufersal", exist_ok=True)
+            local_filepath = os.path.join('/usr/local/airflow/dags/xml_files_shufersal', filename)
 
             with open(local_filepath, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
@@ -73,7 +73,8 @@ def extract_data():
                             if xml_file_path:
                                 print(f'File saved as: {xml_file_path}')
                                 all_branches.append(branch_name)
-                                time.sleep(1)  # Optional: pause briefly to avoid overwhelming the server with requests
+                                time.sleep(1) 
+
                         else:
                             print(f'Skipping file for branch: {branch_name} (not a price category)')
                     else:

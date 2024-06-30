@@ -15,4 +15,4 @@ __pycache__/
 docker-compose.override.yml
 
 #folders
-xml_files
+xml_files_*

@@ -1,11 +1,8 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.operators.postgres_operator import PostgresOperator
-from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 import os
-
 
 
 print("All Dag modules are ok ......")
@@ -18,13 +15,24 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
+def create_postgres_table():
+    from ETL_functions.load_functions import create_postgres_table
+    create_postgres_table()
 
-def transform_data(**kwargs):
-    from ETL_functions.transform_functions import transform_data
+def transform_data_shufersal(**kwargs):
+    from ETL_functions.transform_functions_shufersal import transform_data
     transform_data(**kwargs)
 
-def extract_data():
-    from ETL_functions.extract_functions import extract_data
+def transform_data_victory(**kwargs):
+    from ETL_functions.transform_functions_victory import transform_data
+    transform_data(**kwargs)
+
+def extract_data_shufersal():
+    from ETL_functions.extract_functions_shufersal import extract_data
+    extract_data()
+
+def extract_data_victory():
+    from ETL_functions.extract_functions_victory import extract_data
     extract_data()
 
 def load_data(**kwargs):
@@ -35,14 +43,8 @@ def get_common_products_and_cheapest_basket():
     from ETL_functions.load_functions import get_common_products_and_cheapest_basket
     get_common_products_and_cheapest_basket()
 
-
-def create_postgres_table():
-    from ETL_functions.load_functions import create_postgres_table
-    create_postgres_table()
-
-
-def clear_xml_files_directory():
-    xml_dir = "/usr/local/airflow/dags/xml_files"
+def clear_xml_files_directory_shufersal():
+    xml_dir = "/usr/local/airflow/dags/xml_files_shufersal"
     for filename in os.listdir(xml_dir):
         file_path = os.path.join(xml_dir, filename)
         try:
@@ -52,10 +54,20 @@ def clear_xml_files_directory():
         except Exception as e:
             print(f"Error deleting {file_path}: {e}")
 
+def clear_xml_files_directory_victory():
+    xml_dir = "/usr/local/airflow/dags/xml_files_victory"
+    for filename in os.listdir(xml_dir):
+        file_path = os.path.join(xml_dir, filename)
+        try:
+            if os.path.isfile(file_path) and filename.endswith('.xml'):
+                os.remove(file_path)
+                print(f"Deleted {file_path}")
+        except Exception as e:
+            print(f"Error deleting {file_path}: {e}")
 
-with DAG('shufersal_branches_extraction', 
+with DAG('branches_extraction', 
          default_args=default_args,
-         schedule_interval='*/60 * * * *',
+         schedule_interval='0 */2 * * *',  # Run once every 2 hours
          catchup=False, 
           max_active_runs=1 
          ) as dag:  
@@ -66,14 +78,24 @@ with DAG('shufersal_branches_extraction',
         trigger_rule='one_success' 
     )
 
-    extract_task = PythonOperator(
-        task_id='extract_data',
-        python_callable=extract_data
+    extract_task_shufersal = PythonOperator(
+        task_id='extract_data_shufersal',
+        python_callable=extract_data_shufersal
+    )
+    extract_task_victory = PythonOperator(
+        task_id='extract_data_victory',
+        python_callable=extract_data_victory
     )
 
-    transform_task = PythonOperator(
+    transform_task_shufersal = PythonOperator(
         task_id='transform_data',
-        python_callable=transform_data,
+        python_callable=transform_data_shufersal,
+        provide_context=True
+    )
+
+    transform_task_victory = PythonOperator(
+        task_id='transform_data_victory',
+        python_callable=transform_data_victory,
         provide_context=True
     )
 
@@ -89,13 +111,16 @@ with DAG('shufersal_branches_extraction',
         python_callable=get_common_products_and_cheapest_basket
     )
 
-
-    clear_xml_files_task = PythonOperator(
-        task_id='clear_xml_files_directory',
-        python_callable=clear_xml_files_directory,
+    clear_xml_files_task_victory = PythonOperator(
+        task_id='clear_xml_files_directory_victory',
+        python_callable=clear_xml_files_directory_victory
+    )
+    clear_xml_files_task_shufersal = PythonOperator(
+        task_id='clear_xml_files_directory_shufersal',
+        python_callable=clear_xml_files_directory_shufersal,
         trigger_rule='all_done'  # Run after all tasks are done
     )
 
-    create_table_task >> extract_task >> transform_task >> load_task  >> get_common_products_and_cheapest_basket_task >> clear_xml_files_task
+    create_table_task >> extract_task_shufersal >> extract_task_victory >> transform_task_shufersal >> transform_task_victory >> load_task  >> get_common_products_and_cheapest_basket_task >> clear_xml_files_task_victory >> clear_xml_files_task_shufersal
 
  

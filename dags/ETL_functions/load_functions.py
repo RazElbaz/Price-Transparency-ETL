@@ -24,8 +24,8 @@ def insert_data_to_postgres(conn, cur, transformed_data):
     - transformed_data: List of dictionaries containing data to insert.
     """
     sql_template = """
-        INSERT INTO stores (StoreId, PriceUpdateDate, ItemCode, ItemType, ItemName, ItemPrice)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO stores (StoreId, PriceUpdateDate, ItemCode, ItemType, ItemName, ItemPrice, SupermarketChain)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
 
     try:
@@ -36,16 +36,17 @@ def insert_data_to_postgres(conn, cur, transformed_data):
                 item['ItemCode'],
                 item['ItemType'],
                 item['ItemName'],
-                item['ItemPrice']
+                item['ItemPrice'],
+                item['SupermarketChain']
             ))
         conn.commit()
         print("Data inserted successfully into PostgreSQL")
     except Exception as e:
         conn.rollback()
         print(f"Error inserting data into PostgreSQL: {e}")
-    finally:
-        cur.close()
-        conn.close()
+    # finally:
+    #     cur.close()
+    #     conn.close()
 
 def create_postgres_table():
     """
@@ -60,7 +61,8 @@ def create_postgres_table():
             ItemCode VARCHAR(50),
             ItemType INT,
             ItemName VARCHAR(255),
-            ItemPrice FLOAT
+            ItemPrice FLOAT,
+            SupermarketChain VARCHAR(50)
         )
     """
 
@@ -105,11 +107,13 @@ def extract_postgres_data_to_file(output_filepath):
 def load_to_postgres(**kwargs):
     # transformed_data = kwargs['task_instance'].xcom_pull(task_ids='transform_data', key='transformed_data')
     transformed_data = kwargs['task_instance'].xcom_pull(task_ids='transform_data', key='transformed_data')
+    transformed_data_victory = kwargs['task_instance'].xcom_pull(task_ids='transform_data_victory', key='')
 
     conn, cur = connect_to_postgres()
 
     try:
         insert_data_to_postgres(conn, cur, transformed_data)
+        insert_data_to_postgres(conn, cur, transformed_data_victory)
         get_common_products_and_cheapest_basket()
         # calculate_total_branch_prices_for_same_items()
     finally:
@@ -161,14 +165,14 @@ def get_common_products_and_cheapest_basket():
             ), 
             branches_with_common_items AS (
                 -- Step 2: Find branches that have all the common items
-                SELECT s.StoreId, SUM(s.ItemPrice) AS TotalPrice
+                SELECT s.StoreId, s.SupermarketChain, SUM(s.ItemPrice) AS TotalPrice
                 FROM stores s
                 JOIN common_items ci ON s.ItemCode = ci.ItemCode AND s.ItemName = ci.ItemName
-                GROUP BY s.StoreId
+                GROUP BY s.StoreId, s.SupermarketChain
                 HAVING COUNT(DISTINCT s.ItemCode || s.ItemName) = (SELECT COUNT(*) FROM common_items)
             )
             -- Step 3: Find the branch with the cheapest sum of item prices
-            SELECT StoreId, TotalPrice
+            SELECT StoreId, SupermarketChain, TotalPrice
             FROM branches_with_common_items
             ORDER BY TotalPrice ASC
             LIMIT 1
@@ -177,7 +181,7 @@ def get_common_products_and_cheapest_basket():
         cheapest_basket = cur.fetchone()
 
         print("\nBranch with the Cheapest Basket of Common Items:")
-        print(f"StoreId: {cheapest_basket[0]}, TotalPrice: {cheapest_basket[1]}")
+        print(f"StoreId: {cheapest_basket[0]}, SupermarketChain: {cheapest_basket[1]}, TotalPrice: {cheapest_basket[2]}")
 
         return common_items, cheapest_basket
 
